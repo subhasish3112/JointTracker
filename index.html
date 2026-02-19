@@ -1,17 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Adaptive ROM Tracker - Precision</title>
+  <title>ROM Tracker - Deep Fix</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <style>
     body { font-family: -apple-system, sans-serif; background: #000; color: white; margin: 0; text-align: center; overflow: hidden; }
-    #ui-panel { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(20, 20, 20, 0.95); padding: 15px; border-radius: 12px; border: 1px solid #007AFF; width: 300px; cursor: move; }
-    
-    /* Status Light Styles */
+    #ui-panel { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(25, 25, 25, 0.95); padding: 15px; border-radius: 12px; border: 1px solid #007AFF; width: 300px; cursor: move; }
     #status-container { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-size: 11px; }
-    #status-light { width: 10px; height: 10px; border-radius: 50%; background: #FF3B30; box-shadow: 0 0 5px #FF3B30; transition: 0.3s; }
-    
+    #status-light { width: 10px; height: 10px; border-radius: 50%; background: #FF3B30; box-shadow: 0 0 5px #FF3B30; }
     .form-row { display: flex; gap: 5px; margin-bottom: 8px; }
     input { background: #111; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; font-size: 12px; width: 100%; }
     .joint-nav { display: flex; gap: 4px; margin: 10px 0; }
@@ -32,26 +29,127 @@
   <div id="ui-panel">
     <div id="status-container">
       <div id="status-light"></div>
-      <span id="status-text">SYSTEM READY</span>
+      <span id="status-text">INITIALIZING AI...</span>
     </div>
-
     <div class="form-row">
       <input type="text" id="pName" placeholder="Patient Name">
       <input type="number" id="pAge" placeholder="Age" style="width:60px">
     </div>
-
     <div class="joint-nav">
       <button id="b-shoulder" class="btn active" onclick="setMode('shoulder')">Shoulder</button>
       <button id="b-elbow" class="btn" onclick="setMode('elbow')">Elbow</button>
       <button id="b-wrist" class="btn" onclick="setMode('wrist')">Wrist</button>
     </div>
-
     <div class="stats">
       <div><div id="l-deg" class="deg">--°</div><div style="font-size:9px">LEFT</div></div>
       <div><div id="r-deg" class="deg">--°</div><div style="font-size:9px">RIGHT</div></div>
     </div>
-
-    <button id="startBtn" class="btn btn-main" onclick="initCam()">START CAMERA</button>
-    
+    <button id="startBtn" class="btn btn-main" onclick="startSequence()">START CAMERA</button>
     <div id="activeBtns" style="display:none">
-      <button class="btn" style="background: #555; width:100%" onclick="flipCam()">🔄 Switch Front/Back</button>
+      <button class="btn" style="background: #555; width:100%" onclick="switchCam()">🔄 Toggle Front/Back</button>
+      <button class="btn btn-snap" onclick="capture()">📸 Save Snapshot</button>
+      <button class="btn" style="background:#FF3B30; margin-top:8px; width:100%" onclick="location.reload()">Reset App</button>
+    </div>
+  </div>
+
+  <video id="input_video" playsinline muted autoplay></video>
+  <canvas id="output_canvas"></canvas>
+
+  <script>
+    const panel = document.getElementById("ui-panel");
+    const statusLight = document.getElementById("status-light");
+    const statusText = document.getElementById("status-text");
+    const video = document.getElementById('input_video');
+    const canvas = document.getElementById('output_canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let isDragging = false, offset = { x: 0, y: 0 };
+    let mode = 'shoulder', devices = [], currentDeviceIdx = 0, cameraHelper = null;
+    const config = { shoulder: { l:[23,11,13], r:[24,12,14] }, elbow: { l:[11,13,15], r:[12,14,16] }, wrist: { l:[13,15,19], r:[14,16,20] } };
+
+    // --- Drag Logic ---
+    panel.onmousedown = (e) => { if(['INPUT','BUTTON'].includes(e.target.tagName)) return; isDragging = true; offset.x = e.clientX-panel.offsetLeft; offset.y = e.clientY-panel.offsetTop; panel.style.transform = 'none'; };
+    document.onmousemove = (e) => { if(isDragging) { panel.style.left = (e.clientX-offset.x)+"px"; panel.style.top = (e.clientY-offset.y)+"px"; }};
+    document.onmouseup = () => isDragging = false;
+
+    // --- AI Setup ---
+    const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+    
+    pose.onResults((res) => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+      if (res.poseLandmarks) {
+        statusLight.style.background = "#34C759"; statusLight.style.boxShadow = "0 0 8px #34C759"; statusText.innerText = "TRACKING ACTIVE";
+        const p = res.poseLandmarks, c = config[mode];
+        const getA = (A,B,C) => {
+          let d = Math.abs((Math.atan2(C.y-B.y, C.x-B.x) - Math.atan2(A.y-B.y, A.x-B.x)) * 180 / Math.PI);
+          return Math.round(d > 180 ? 360 - d : d);
+        };
+        document.getElementById('l-deg').innerText = getA(p[c.l[0]], p[c.l[1]], p[c.l[2]]) + "°";
+        document.getElementById('r-deg').innerText = getA(p[c.r[0]], p[c.r[1]], p[c.r[2]]) + "°";
+        const draw = (A,B,C,col) => {
+          ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.beginPath();
+          ctx.moveTo(A.x*canvas.width, A.y*canvas.height); ctx.lineTo(B.x*canvas.width, B.y*canvas.height); ctx.lineTo(C.x*canvas.width, C.y*canvas.height);
+          ctx.stroke();
+        };
+        draw(p[c.l[0]], p[c.l[1]], p[c.l[2]], "#00ff88"); draw(p[c.r[0]], p[c.r[1]], p[c.r[2]], "#00d9ff");
+      } else {
+        statusLight.style.background = "#FF3B30"; statusText.innerText = "WAITING FOR BODY...";
+      }
+    });
+
+    // --- Camera Engine ---
+    async function startSequence() {
+      document.getElementById('startBtn').style.display = 'none';
+      document.getElementById('activeBtns').style.display = 'block';
+      
+      // Request permission first
+      await navigator.mediaDevices.getUserMedia({ video: true });
+      const allDevices = await navigator.mediaDevices.enumerateDevices();
+      devices = allDevices.filter(d => d.kind === 'videoinput');
+      
+      // Start with the last camera (usually the primary rear lens)
+      currentDeviceIdx = devices.length - 1;
+      await launchCamera();
+    }
+
+    async function launchCamera() {
+      if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+      if (cameraHelper) await cameraHelper.stop();
+
+      const constraints = { video: { deviceId: { exact: devices[currentDeviceIdx].deviceId } } };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      video.srcObject = stream;
+      
+      cameraHelper = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 640, height: 480 });
+      cameraHelper.start();
+    }
+
+    function switchCam() {
+      currentDeviceIdx = (currentDeviceIdx + 1) % devices.length;
+      launchCamera();
+    }
+
+    function setMode(m) {
+      mode = m;
+      document.querySelectorAll('.joint-nav .btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`b-${m}`).classList.add('active');
+    }
+
+    function capture() {
+      const name = document.getElementById('pName').value || "Patient";
+      ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(10, 10, 240, 100);
+      ctx.fillStyle = "white"; ctx.font = "bold 16px sans-serif";
+      ctx.fillText(`Name: ${name}`, 20, 35);
+      ctx.fillText(`Joint: ${mode.toUpperCase()}`, 20, 60);
+      ctx.fillText(`L: ${document.getElementById('l-deg').innerText} | R: ${document.getElementById('r-deg').innerText}`, 20, 85);
+      const a = document.createElement('a'); a.download = `${name}.png`; a.href = canvas.toDataURL(); a.click();
+    }
+
+    window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
+    window.dispatchEvent(new Event('resize'));
+    statusText.innerText = "READY";
+  </script>
+</body>
+</html>
