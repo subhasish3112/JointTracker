@@ -1,73 +1,84 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Clinical ROM Tracker - Fixed</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>ROM Clinical Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <style>
-    body { font-family: -apple-system, sans-serif; background: #000; color: white; margin: 0; text-align: center; overflow: hidden; }
-    #ui-panel { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(25, 25, 25, 0.98); padding: 15px; border-radius: 12px; border: 2px solid #007AFF; width: 310px; cursor: move; box-sizing: border-box; }
-    #status-container { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 10px; font-size: 11px; }
-    #status-light { width: 10px; height: 10px; border-radius: 50%; background: #FF3B30; }
+    :root { --primary: #007AFF; --success: #34C759; --danger: #FF3B30; --bg: #000; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: white; margin: 0; overflow: hidden; touch-action: none; }
     
-    /* Strict Layout for Form */
-    .form-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-    .form-row { display: flex; gap: 5px; width: 100%; }
-    input, select { background: #111; border: 1px solid #555; color: white; padding: 10px; border-radius: 6px; font-size: 14px; box-sizing: border-box; }
+    #ui-panel { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(28, 28, 30, 0.95); padding: 18px; border-radius: 16px; border: 1px solid var(--primary); width: 320px; box-shadow: 0 12px 40px rgba(0,0,0,0.7); cursor: move; }
     
-    .joint-nav { display: flex; gap: 4px; margin: 10px 0; }
-    .stats { display: flex; gap: 20px; justify-content: center; margin: 10px 0; }
-    .deg { font-size: 42px; font-weight: bold; }
-    #l-deg { color: #00ff88; }
-    #r-deg { color: #00d9ff; }
+    #status-bar { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 12px; font-size: 11px; letter-spacing: 1px; font-weight: 600; }
+    #status-light { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 8px var(--danger); transition: all 0.3s; }
+    
+    .input-grid { display: grid; grid-template-columns: 2fr 1fr 1.2fr; gap: 6px; margin-bottom: 8px; }
+    input, select { background: #2c2c2e; border: 1px solid #3a3a3c; color: white; padding: 10px; border-radius: 8px; font-size: 14px; outline: none; }
+    input:focus { border-color: var(--primary); }
+    
+    .nav-tabs { display: flex; gap: 4px; margin: 12px 0; background: #2c2c2e; padding: 3px; border-radius: 10px; }
+    .nav-tabs button { background: transparent; border: none; color: #8e8e93; padding: 8px; border-radius: 8px; flex: 1; cursor: pointer; font-size: 12px; transition: 0.2s; }
+    .nav-tabs button.active { background: #636366; color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+    
+    .display-angles { display: flex; justify-content: space-around; margin: 10px 0; }
+    .angle-box { text-align: center; }
+    .angle-val { font-size: 44px; font-weight: 800; line-height: 1; }
+    #l-val { color: #30d158; }
+    #r-val { color: #64d2ff; }
+    .angle-label { font-size: 10px; color: #8e8e93; margin-top: 4px; font-weight: bold; }
     
     canvas { width: 100vw; height: 100vh; object-fit: contain; }
     video { display: none; }
     
-    .btn { background: #333; color: white; border: none; padding: 12px; border-radius: 6px; cursor: pointer; flex: 1; font-size: 12px; }
-    .btn.active { background: #007AFF; font-weight: bold; }
-    .btn-main { background: #28a745; width: 100%; font-weight: bold; margin-top: 5px; font-size: 14px; }
-    .btn-snap { background: #FF9500; width: 100%; margin-top: 8px; font-weight: bold; }
+    .main-btn { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; width: 100%; font-weight: bold; font-size: 15px; cursor: pointer; margin-top: 5px; }
+    .secondary-btn { background: #3a3a3c; color: white; border: none; padding: 10px; border-radius: 8px; width: 100%; margin-top: 8px; font-size: 13px; cursor: pointer; }
+    .snap-btn { background: var(--success); color: white; border: none; padding: 12px; border-radius: 10px; width: 100%; margin-top: 8px; font-weight: bold; font-size: 14px; cursor: pointer; }
   </style>
 </head>
 <body>
 
   <div id="ui-panel">
-    <div id="status-container">
+    <div id="status-bar">
       <div id="status-light"></div>
-      <span id="status-text">INITIALIZING...</span>
+      <span id="status-text">INITIALIZING</span>
     </div>
     
-    <div class="form-container">
-      <div class="form-row">
-        <input type="text" id="pName" placeholder="Name" style="flex: 3;">
+    <div class="input-grid">
+      <input type="text" id="pName" placeholder="Name">
+      <input type="number" id="pAge" placeholder="Age">
+      <select id="pSex">
+        <option value="M">Male</option>
+        <option value="F">Female</option>
+        <option value="O">Other</option>
+      </select>
+    </div>
+    
+    <div class="nav-tabs">
+      <button id="tab-shoulder" class="active" onclick="setJoint('shoulder')">Shoulder</button>
+      <button id="tab-elbow" onclick="setJoint('elbow')">Elbow</button>
+      <button id="tab-wrist" onclick="setJoint('wrist')">Wrist</button>
+    </div>
+
+    <div class="display-angles">
+      <div class="angle-box">
+        <div id="l-val" class="angle-val">--°</div>
+        <div class="angle-label">LEFT</div>
       </div>
-      <div class="form-row">
-        <input type="number" id="pAge" placeholder="Age" style="flex: 1;">
-        <select id="pSex" style="flex: 1;"><option>Male</option><option>Female</option><option>Other</option></select>
-      </div>
-      <div class="form-row">
-        <input type="text" id="pDate" readonly style="width: 100%; font-size: 11px; color: #aaa;">
+      <div class="angle-box">
+        <div id="r-val" class="angle-val">--°</div>
+        <div class="angle-label">RIGHT</div>
       </div>
     </div>
 
-    <div class="joint-nav">
-      <button id="b-shoulder" class="btn active" onclick="setMode('shoulder')">Shoulder</button>
-      <button id="b-elbow" class="btn" onclick="setMode('elbow')">Elbow</button>
-      <button id="b-wrist" class="btn" onclick="setMode('wrist')">Wrist</button>
-    </div>
+    <button id="startBtn" class="main-btn" onclick="startApp()">START TRACKER</button>
     
-    <div class="stats">
-      <div><div id="l-deg" class="deg">--°</div><div style="font-size:9px">LEFT</div></div>
-      <div><div id="r-deg" class="deg">--°</div><div style="font-size:9px">RIGHT</div></div>
-    </div>
-    
-    <button id="startBtn" class="btn btn-main" onclick="startCamera()">TAP TO START CAMERA</button>
-    
-    <div id="activeBtns" style="display:none">
-      <button class="btn" style="background: #555; width:100%" onclick="flipCamera()">🔄 Flip Camera Lens</button>
-      <button class="btn btn-snap" onclick="capture()">📸 Save Snapshot</button>
-      <button class="btn" style="background:#FF3B30; margin-top:8px; width:100%" onclick="location.reload()">Reset App</button>
+    <div id="active-controls" style="display:none">
+      <button id="flipBtn" class="secondary-btn" onclick="cycleCamera()">🔄 Switch Camera Lens</button>
+      <button class="snap-btn" onclick="saveResult()">📸 Capture Result</button>
+      <button class="secondary-btn" style="color: var(--danger);" onclick="location.reload()">Reset</button>
     </div>
   </div>
 
@@ -75,90 +86,118 @@
   <canvas id="output_canvas"></canvas>
 
   <script>
+    // --- Draggable Panel ---
     const panel = document.getElementById("ui-panel");
-    const statusLight = document.getElementById("status-light");
-    const statusText = document.getElementById("status-text");
+    let isDragging = false, offset = { x: 0, y: 0 };
+    panel.onmousedown = (e) => { if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName)) return; isDragging = true; offset.x = e.clientX - panel.offsetLeft; offset.y = e.clientY - panel.offsetTop; panel.style.transform = 'none'; };
+    document.onmousemove = (e) => { if(isDragging) { panel.style.left = (e.clientX - offset.x) + "px"; panel.style.top = (e.clientY - offset.y) + "px"; }};
+    document.onmouseup = () => isDragging = false;
+
+    // --- Pose Estimation Setup ---
     const video = document.getElementById('input_video');
     const canvas = document.getElementById('output_canvas');
     const ctx = canvas.getContext('2d');
+    const statusLight = document.getElementById('status-light');
+    const statusText = document.getElementById('status-text');
     
-    document.getElementById('pDate').value = "Date: " + new Date().toLocaleDateString();
+    let jointMode = 'shoulder', facing = 'environment', cameraActive = null;
+    const jointMap = {
+      shoulder: { l:[23,11,13], r:[24,12,14], title: "Shoulder" },
+      elbow: { l:[11,13,15], r:[12,14,16], title: "Elbow" },
+      wrist: { l:[13,15,19], r:[14,16,20], title: "Wrist" }
+    };
 
-    let isDragging = false, offset = { x: 0, y: 0 };
-    let mode = 'shoulder', facing = 'environment', cameraHelper = null;
-    const config = { shoulder: { l:[23,11,13], r:[24,12,14] }, elbow: { l:[11,13,15], r:[12,14,16] }, wrist: { l:[13,15,19], r:[14,16,20] } };
-
-    // --- DRAG LOGIC ---
-    panel.onmousedown = (e) => { if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName)) return; isDragging = true; offset.x = e.clientX-panel.offsetLeft; offset.y = e.clientY-panel.offsetTop; panel.style.transform = 'none'; };
-    document.onmousemove = (e) => { if(isDragging) { panel.style.left = (e.clientX-offset.x)+"px"; panel.style.top = (e.clientY-offset.y)+"px"; }};
-    document.onmouseup = () => isDragging = false;
-
-    // --- AI LOGIC ---
     const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
-    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
-    
+    pose.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.65, minTrackingConfidence: 0.65 });
+
     pose.onResults((res) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
+      
       if (res.poseLandmarks) {
-        statusLight.style.background = "#34C759"; statusText.innerText = "TRACKING ACTIVE";
-        const p = res.poseLandmarks, c = config[mode];
-        const getA = (A,B,C) => {
+        statusLight.style.background = "#34C759"; statusLight.style.boxShadow = "0 0 8px #34C759"; statusText.innerText = "TRACKING ACTIVE";
+        const p = res.poseLandmarks;
+        const c = jointMap[jointMode];
+
+        const calc = (A,B,C) => {
           let d = Math.abs((Math.atan2(C.y-B.y, C.x-B.x) - Math.atan2(A.y-B.y, A.x-B.x)) * 180 / Math.PI);
           return Math.round(d > 180 ? 360 - d : d);
         };
-        document.getElementById('l-deg').innerText = getA(p[c.l[0]], p[c.l[1]], p[c.l[2]]) + "°";
-        document.getElementById('r-deg').innerText = getA(p[c.r[0]], p[c.r[1]], p[c.r[2]]) + "°";
+
+        const lA = calc(p[c.l[0]], p[c.l[1]], p[c.l[2]]);
+        const rA = calc(p[c.r[0]], p[c.r[1]], p[c.r[2]]);
+        
+        document.getElementById('l-val').innerText = lA + "°";
+        document.getElementById('r-val').innerText = rA + "°";
+
         const draw = (A,B,C,col) => {
           ctx.strokeStyle = col; ctx.lineWidth = 6; ctx.lineCap = "round"; ctx.beginPath();
           ctx.moveTo(A.x*canvas.width, A.y*canvas.height); ctx.lineTo(B.x*canvas.width, B.y*canvas.height); ctx.lineTo(C.x*canvas.width, C.y*canvas.height);
           ctx.stroke();
         };
-        draw(p[c.l[0]], p[c.l[1]], p[c.l[2]], "#00ff88"); draw(p[c.r[0]], p[c.r[1]], p[c.r[2]], "#00d9ff");
+        draw(p[c.l[0]], p[c.l[1]], p[c.l[2]], "#30d158");
+        draw(p[c.r[0]], p[c.r[1]], p[c.r[2]], "#64d2ff");
       } else {
-        statusLight.style.background = "#FF3B30"; statusText.innerText = "WAITING FOR BODY...";
+        statusLight.style.background = "#FF3B30"; statusLight.style.boxShadow = "0 0 8px #FF3B30"; statusText.innerText = "WAITING FOR SUBJECT";
       }
     });
 
-    // --- CAMERA LOGIC ---
-    async function startCamera() {
+    // --- Camera Control ---
+    async function startApp() {
       document.getElementById('startBtn').style.display = 'none';
-      document.getElementById('activeBtns').style.display = 'block';
-      await launch();
+      document.getElementById('active-controls').style.display = 'block';
+      
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      if(!isMobile) document.getElementById('flipBtn').style.display = 'none';
+      
+      await openStream();
     }
 
-    async function launch() {
+    async function openStream() {
       if (video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
       const constraints = { video: { facingMode: facing } };
+      
       try {
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
-        cameraHelper = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 640, height: 480 });
-        await cameraHelper.start();
-      } catch (e) { alert("Camera Error: Tap Reset and try again."); }
+        cameraActive = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 640, height: 480 });
+        cameraActive.start();
+      } catch (err) {
+        const fallback = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = fallback;
+        cameraActive = new Camera(video, { onFrame: async () => { await pose.send({image: video}); }, width: 640, height: 480 });
+        cameraActive.start();
+      }
     }
 
-    function flipCamera() { facing = (facing === 'user') ? 'environment' : 'user'; launch(); }
-    
-    function setMode(m) {
-      mode = m;
-      document.querySelectorAll('.joint-nav .btn').forEach(b => b.classList.remove('active'));
-      document.getElementById(`b-${m}`).classList.add('active');
+    function cycleCamera() {
+      facing = (facing === 'user') ? 'environment' : 'user';
+      openStream();
     }
 
-    function capture() {
+    function setJoint(j) {
+      jointMode = j;
+      document.querySelectorAll('.nav-tabs button').forEach(b => b.classList.remove('active'));
+      document.getElementById(`tab-${j}`).classList.add('active');
+    }
+
+    function saveResult() {
       const name = document.getElementById('pName').value || "Patient";
-      const age = document.getElementById('pAge').value || "N/A";
+      const date = new Date().toLocaleDateString();
       const sex = document.getElementById('pSex').value;
-      const date = document.getElementById('pDate').value;
-      
-      ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(10, 10, 260, 120);
-      ctx.fillStyle = "white"; ctx.font = "bold 16px sans-serif";
-      ctx.fillText(`Name: ${name} (${sex}, ${age}y)`, 20, 35);
-      ctx.fillText(`${date}`, 20, 60);
-      ctx.fillText(`Joint: ${mode.toUpperCase()}`, 20, 85);
-      ctx.fillText(`L: ${document.getElementById('l-deg').innerText} | R: ${document.getElementById('r-deg').innerText}`, 20, 110);
-      const a = document.createElement('a'); a.download = `${name}.png`; a.href = canvas.toDataURL(); a.click();
+      const age = document.getElementById('pAge').value || "XX";
+
+      ctx.fillStyle = "rgba(0,0,0,0.85)"; ctx.fillRect(15, 15, 280, 130);
+      ctx.fillStyle = "white"; ctx.font = "bold 18px -apple-system";
+      ctx.fillText(`PATIENT: ${name}`, 30, 45);
+      ctx.fillText(`DETAILS: ${sex}, ${age}y | ${date}`, 30, 75);
+      ctx.fillText(`JOINT: ${jointMap[jointMode].title.toUpperCase()}`, 30, 105);
+      ctx.fillText(`LEFT: ${document.getElementById('l-val').innerText}  RIGHT: ${document.getElementById('r-val').innerText}`, 30, 130);
+
+      const link = document.createElement('a');
+      link.download = `${name}_ROM_${jointMode}.png`;
+      link.href = canvas.toDataURL();
+      link.click();
     }
 
     window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
