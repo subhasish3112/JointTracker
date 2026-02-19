@@ -3,45 +3,49 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>Clinical ROM - Locked Lens</title>
+  <title>Compact ROM Tracker</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
   <style>
     :root { --accent: #007AFF; --green: #34C759; --red: #FF3B30; }
-    body { font-family: -apple-system, sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; text-align: center; }
+    body { font-family: -apple-system, sans-serif; background: #000; color: #fff; margin: 0; overflow: hidden; }
     
-    #ui-panel { position: fixed; top: 15px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(25, 25, 25, 0.95); padding: 15px; border-radius: 14px; border: 1px solid var(--accent); width: 310px; cursor: move; box-sizing: border-box; }
+    /* Sleek, Shorter Panel */
+    #ui-panel { 
+      position: fixed; top: 10px; left: 50%; transform: translateX(-50%); 
+      z-index: 1000; background: rgba(20, 20, 20, 0.85); 
+      padding: 10px 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.2); 
+      width: 320px; cursor: move; box-sizing: border-box; backdrop-filter: blur(10px);
+    }
     
-    .form-container { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
-    .form-row { display: flex; gap: 5px; width: 100%; }
-    input, select { background: #1c1c1e; border: 1px solid #3a3a3c; color: #fff; padding: 10px; border-radius: 8px; font-size: 14px; box-sizing: border-box; width: 100%; outline: none; }
+    .form-compact { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 4px; margin-bottom: 8px; }
+    input, select { background: #2c2c2e; border: 1px solid #444; color: #fff; padding: 6px; border-radius: 6px; font-size: 12px; width: 100%; outline: none; }
     
-    .joint-nav { display: flex; gap: 4px; margin: 12px 0; }
-    .nav-btn { background: #2c2c2e; color: #8e8e93; border: none; padding: 10px; border-radius: 8px; flex: 1; font-size: 12px; cursor: pointer; }
+    .joint-nav { display: flex; gap: 3px; margin: 8px 0; }
+    .nav-btn { background: #3a3a3c; color: #aaa; border: none; padding: 6px; border-radius: 6px; flex: 1; font-size: 11px; cursor: pointer; }
     .nav-btn.active { background: var(--accent); color: #fff; font-weight: bold; }
     
-    .stats { display: flex; gap: 25px; justify-content: center; margin: 10px 0; }
-    .deg-val { font-size: 44px; font-weight: 800; line-height: 1; }
+    .stats { display: flex; gap: 30px; justify-content: center; margin: 5px 0; }
+    .deg-val { font-size: 32px; font-weight: 700; line-height: 1; }
     #l-val { color: var(--green); }
     #r-val { color: #64d2ff; }
+    .label { font-size: 9px; color: #888; text-transform: uppercase; margin-top: 2px; }
     
     canvas { width: 100vw; height: 100vh; object-fit: contain; }
     video { display: none; }
     
-    .action-btn { background: var(--accent); color: #fff; border: none; padding: 14px; border-radius: 10px; width: 100%; font-weight: bold; font-size: 14px; cursor: pointer; }
-    .capture-btn { background: var(--green); margin-top: 8px; }
-    .flip-btn { background: #3a3a3c; margin-top: 8px; font-size: 12px; }
+    .action-row { display: flex; gap: 5px; margin-top: 8px; }
+    .action-btn { background: var(--accent); color: #fff; border: none; padding: 10px; border-radius: 8px; flex: 1; font-weight: bold; font-size: 12px; cursor: pointer; }
+    .snap-btn { background: var(--green); }
+    .reset-btn { background: var(--red); flex: 0.4; }
   </style>
 </head>
 <body>
 
   <div id="ui-panel">
-    <div class="form-container">
-      <div class="form-row"><input type="text" id="pName" placeholder="Patient Name"></div>
-      <div class="form-row">
-        <input type="number" id="pAge" placeholder="Age" style="flex: 1;">
-        <select id="pSex" style="flex: 1.5;"><option>Male</option><option>Female</option><option>Other</option></select>
-      </div>
-      <div class="form-row"><input type="text" id="pDate" readonly style="font-size: 11px; color: #8e8e93; text-align: center;"></div>
+    <div class="form-compact">
+      <input type="text" id="pName" placeholder="Name">
+      <input type="number" id="pAge" placeholder="Age">
+      <select id="pSex"><option>M</option><option>F</option><option>O</option></select>
     </div>
 
     <div class="joint-nav">
@@ -51,16 +55,18 @@
     </div>
     
     <div class="stats">
-      <div><div id="l-val" class="deg-val">--°</div><div style="font-size:10px; color:#8e8e93">LEFT</div></div>
-      <div><div id="r-val" class="deg-val">--°</div><div style="font-size:10px; color:#8e8e93">RIGHT</div></div>
+      <div style="text-align:center"><div id="l-val" class="deg-val">--°</div><div class="label">Left</div></div>
+      <div style="text-align:center"><div id="r-val" class="deg-val">--°</div><div class="label">Right</div></div>
     </div>
     
-    <button id="startBtn" class="action-btn" onclick="initApp()">START TRACKER</button>
+    <button id="startBtn" class="action-btn" style="width:100%" onclick="initApp()">START TRACKER</button>
     
     <div id="active-ui" style="display:none">
-      <button class="action-btn flip-btn" onclick="toggleLens()">🔄 Flip Camera Lens</button>
-      <button class="action-btn capture-btn" onclick="snap()">📸 Save Snapshot</button>
-      <button class="action-btn" style="background:var(--red); margin-top:8px; font-size:12px" onclick="location.reload()">Reset</button>
+      <div class="action-row">
+        <button class="action-btn" style="background:#444" onclick="toggleLens()">🔄 Flip</button>
+        <button class="action-btn snap-btn" onclick="snap()">📸 Capture</button>
+        <button class="action-btn reset-btn" onclick="location.reload()">✖</button>
+      </div>
     </div>
   </div>
 
@@ -72,18 +78,16 @@
     const v = document.getElementById('v');
     const canvas = document.getElementById('c');
     const ctx = canvas.getContext('2d');
-    document.getElementById('pDate').value = "Exam Date: " + new Date().toLocaleDateString();
 
     let isDragging = false, offset = {x:0, y:0};
     let mode = 'shoulder', facing = 'environment', pose = null;
     const joints = { shoulder:{l:[23,11,13], r:[24,12,14]}, elbow:{l:[11,13,15], r:[12,14,16]}, wrist:{l:[13,15,19], r:[14,16,20]} };
 
-    // --- DRAG ---
+    // --- DRAG LOGIC ---
     panel.onmousedown = (e) => { if(['INPUT','BUTTON','SELECT'].includes(e.target.tagName)) return; isDragging = true; offset.x = e.clientX-panel.offsetLeft; offset.y = e.clientY-panel.offsetTop; panel.style.transform = 'none'; };
     document.onmousemove = (e) => { if(isDragging) { panel.style.left = (e.clientX-offset.x)+"px"; panel.style.top = (e.clientY-offset.y)+"px"; }};
     document.onmouseup = () => isDragging = false;
 
-    // --- AI ---
     function setupPose() {
       pose = new Pose({locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}`});
       pose.setOptions({modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6});
@@ -110,7 +114,6 @@
       }
     }
 
-    // --- CAMERA ---
     async function initApp() {
       document.getElementById('startBtn').style.display = 'none';
       document.getElementById('active-ui').style.display = 'block';
@@ -123,21 +126,17 @@
       try {
         const stream = await navigator.mediaDevices.getUserMedia({video: {facingMode: facing}});
         v.srcObject = stream;
-        v.onloadedmetadata = () => {
-          canvas.width = v.videoWidth; canvas.height = v.videoHeight;
-          requestAnimationFrame(processFrame);
-        };
-      } catch (e) { alert("Camera Error. Check permissions."); }
+        v.onloadedmetadata = () => { canvas.width = v.videoWidth; canvas.height = v.videoHeight; loop(); };
+      } catch (e) { alert("Camera Access Required."); }
     }
 
-    async function processFrame() {
+    async function loop() {
       if(v.paused || v.ended) return;
       await pose.send({image: v});
-      requestAnimationFrame(processFrame);
+      requestAnimationFrame(loop);
     }
 
     function toggleLens() { facing = (facing === 'user') ? 'environment' : 'user'; startCam(); }
-    
     function setJoint(j) {
       mode = j;
       document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
@@ -146,10 +145,11 @@
 
     function snap() {
       const name = document.getElementById('pName').value || "Patient";
+      const date = new Date().toLocaleDateString();
       ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(10, 10, 240, 110);
       ctx.fillStyle = "white"; ctx.font = "bold 14px sans-serif";
       ctx.fillText(`Name: ${name}`, 20, 30);
-      ctx.fillText(`Details: ${document.getElementById('pSex').value}, ${document.getElementById('pAge').value}y`, 20, 50);
+      ctx.fillText(`Details: ${document.getElementById('pSex').value}, ${document.getElementById('pAge').value}y | ${date}`, 20, 50);
       ctx.fillText(`Joint: ${mode.toUpperCase()}`, 20, 70);
       ctx.fillText(`L: ${document.getElementById('l-val').innerText} | R: ${document.getElementById('r-val').innerText}`, 20, 95);
       const a = document.createElement('a'); a.download = `${name}_ROM.png`; a.href = canvas.toDataURL(); a.click();
