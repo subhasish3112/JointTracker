@@ -1,41 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Draggable Clinical ROM Tracker</title>
+  <title>Clinical ROM Tracker - Rear Cam</title>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
   <style>
     body { font-family: -apple-system, sans-serif; background: #000; color: white; margin: 0; text-align: center; overflow: hidden; }
-    
-    /* Draggable Panel Styles */
-    #ui-panel { 
-      position: fixed; 
-      top: 20px; 
-      left: 50%; 
-      transform: translateX(-50%); 
-      z-index: 1000; 
-      background: rgba(30, 30, 30, 0.95); 
-      padding: 15px; 
-      border-radius: 12px; 
-      border: 1px solid #007AFF; 
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      cursor: move; /* Shows user they can move it */
-      width: 320px;
-    }
-
-    .form-row { display: flex; gap: 5px; margin-bottom: 10px; justify-content: center; pointer-events: auto; }
-    input, select { background: #222; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; font-size: 12px; pointer-events: auto; }
-    
-    .joint-nav { margin: 8px 0; pointer-events: auto; }
-    .stats { display: flex; gap: 30px; justify-content: center; margin: 5px 0; pointer-events: auto; }
+    #ui-panel { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(30, 30, 30, 0.95); padding: 15px; border-radius: 12px; border: 1px solid #007AFF; width: 320px; cursor: move; }
+    .form-row { display: flex; gap: 5px; margin-bottom: 10px; justify-content: center; }
+    input, select { background: #222; border: 1px solid #555; color: white; padding: 5px; border-radius: 4px; font-size: 12px; }
+    .joint-nav { margin: 8px 0; }
+    .stats { display: flex; gap: 30px; justify-content: center; margin: 5px 0; }
     .deg { font-size: 40px; font-weight: bold; }
     #l-deg { color: #00ff88; }
     #r-deg { color: #00d9ff; }
-    
     canvas { width: 100vw; height: 100vh; object-fit: contain; }
     video { display: none; }
-    
-    .btn { background: #444; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; pointer-events: auto; }
+    .btn { background: #444; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 13px; }
     .btn.active { background: #007AFF; }
     .btn-go { background: #28a745; font-weight: bold; width: 100%; margin-top: 10px; }
     .btn-snap { background: #FF9500; margin-top: 10px; }
@@ -44,71 +25,49 @@
 <body>
 
   <div id="ui-panel">
-    <div style="font-size: 10px; color: #777; margin-bottom: 5px;">DRAG BOX TO MOVE</div>
+    <div style="font-size: 10px; color: #777; margin-bottom: 5px;">DRAG TO MOVE</div>
     <div class="form-row">
       <input type="text" id="pName" placeholder="Patient Name">
       <input type="number" id="pAge" placeholder="Age" style="width:45px">
       <select id="pSex"><option>M</option><option>F</option></select>
     </div>
-    <div class="form-row">
-       <input type="text" id="pDate" readonly style="width:100%">
-    </div>
-    
     <div class="joint-nav">
       <button id="b-shoulder" class="btn active" onclick="setMode('shoulder')">Shoulder</button>
       <button id="b-elbow" class="btn" onclick="setMode('elbow')">Elbow</button>
       <button id="b-wrist" class="btn" onclick="setMode('wrist')">Wrist</button>
     </div>
-
     <div class="stats">
       <div><div id="l-deg" class="deg">--°</div><div style="font-size:9px">LEFT</div></div>
       <div><div id="r-deg" class="deg">--°</div><div style="font-size:9px">RIGHT</div></div>
     </div>
-
-    <button id="startBtn" class="btn btn-go" onclick="runCamera()">Start Session</button>
+    <button id="startBtn" class="btn btn-go" onclick="runCamera()">Start Rear Camera</button>
     <div id="activeBtns" style="display:none">
       <button class="btn btn-snap" onclick="capture()">Capture Photo</button>
       <button class="btn" style="background:#FF3B30; margin-top:10px" onclick="location.reload()">Reset</button>
     </div>
   </div>
 
-  <video id="input_video"></video>
+  <video id="input_video" playsinline></video>
   <canvas id="output_canvas"></canvas>
 
   <script>
     // --- DRAGGABLE LOGIC ---
     const panel = document.getElementById("ui-panel");
-    let isDragging = false;
-    let offset = { x: 0, y: 0 };
-
-    panel.addEventListener("mousedown", (e) => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON' || e.target.tagName === 'SELECT') return;
-      isDragging = true;
-      offset.x = e.clientX - panel.offsetLeft;
-      offset.y = e.clientY - panel.offsetTop;
-      panel.style.transform = 'none'; // Remove centering transform once moved
-    });
-
-    document.addEventListener("mousemove", (e) => {
-      if (!isDragging) return;
-      panel.style.left = (e.clientX - offset.x) + "px";
-      panel.style.top = (e.clientY - offset.y) + "px";
-    });
-
-    document.addEventListener("mouseup", () => { isDragging = false; });
+    let isDragging = false; let offset = { x: 0, y: 0 };
+    panel.onmousedown = (e) => {
+      if (['INPUT','BUTTON','SELECT'].includes(e.target.tagName)) return;
+      isDragging = true; offset.x = e.clientX - panel.offsetLeft; offset.y = e.clientY - panel.offsetTop;
+      panel.style.transform = 'none';
+    };
+    document.onmousemove = (e) => { if (isDragging) { panel.style.left = (e.clientX - offset.x) + "px"; panel.style.top = (e.clientY - offset.y) + "px"; }};
+    document.onmouseup = () => { isDragging = false; };
 
     // --- TRACKING LOGIC ---
     const video = document.getElementById('input_video');
     const canvas = document.getElementById('output_canvas');
     const ctx = canvas.getContext('2d');
-    document.getElementById('pDate').value = new Date().toLocaleDateString();
-
     let mode = 'shoulder';
-    const config = {
-      shoulder: { l: [23, 11, 13], r: [24, 12, 14] },
-      elbow: { l: [11, 13, 15], r: [12, 14, 16] },
-      wrist: { l: [13, 15, 19], r: [14, 16, 20] }
-    };
+    const config = { shoulder: { l: [23, 11, 13], r: [24, 12, 14] }, elbow: { l: [11, 13, 15], r: [12, 14, 16] }, wrist: { l: [13, 15, 19], r: [14, 16, 20] } };
 
     function setMode(m) {
       mode = m;
@@ -119,44 +78,62 @@
     const pose = new Pose({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${f}` });
     pose.setOptions({ modelComplexity: 0, minDetectionConfidence: 0.5 });
 
-    function getAngle(A, B, C) {
-      let d = Math.abs((Math.atan2(C.y-B.y, C.x-B.x) - Math.atan2(A.y-B.y, A.x-B.x)) * 180 / Math.PI);
-      return Math.round(d > 180 ? 360 - d : d);
-    }
-
     pose.onResults((res) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(res.image, 0, 0, canvas.width, canvas.height);
       if (!res.poseLandmarks) return;
       const p = res.poseLandmarks;
       const c = config[mode];
-      
-      const lA = getAngle(p[c.l[0]], p[c.l[1]], p[c.l[2]]);
-      document.getElementById('l-deg').innerText = lA + "°";
-      draw(p[c.l[0]], p[c.l[1]], p[c.l[2]], "#00ff88");
 
-      const rA = getAngle(p[c.r[0]], p[c.r[1]], p[c.r[2]]);
-      document.getElementById('r-deg').innerText = rA + "°";
+      const getA = (A, B, C) => {
+        let d = Math.abs((Math.atan2(C.y-B.y, C.x-B.x) - Math.atan2(A.y-B.y, A.x-B.x)) * 180 / Math.PI);
+        return Math.round(d > 180 ? 360 - d : d);
+      };
+
+      document.getElementById('l-deg').innerText = getA(p[c.l[0]], p[c.l[1]], p[c.l[2]]) + "°";
+      document.getElementById('r-deg').innerText = getA(p[c.r[0]], p[c.r[1]], p[c.r[2]]) + "°";
+      
+      const draw = (A, B, C, col) => {
+        ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath();
+        ctx.moveTo(A.x*canvas.width, A.y*canvas.height); ctx.lineTo(B.x*canvas.width, B.y*canvas.height); ctx.lineTo(C.x*canvas.width, C.y*canvas.height);
+        ctx.stroke();
+      };
+      draw(p[c.l[0]], p[c.l[1]], p[c.l[2]], "#00ff88");
       draw(p[c.r[0]], p[c.r[1]], p[c.r[2]], "#00d9ff");
     });
 
-    function draw(A, B, C, col) {
-      ctx.strokeStyle = col; ctx.lineWidth = 4; ctx.beginPath();
-      ctx.moveTo(A.x*canvas.width, A.y*canvas.height);
-      ctx.lineTo(B.x*canvas.width, B.y*canvas.height);
-      ctx.lineTo(C.x*canvas.width, C.y*canvas.height);
-      ctx.stroke();
-    }
-
-    const cam = new Camera(video, {
-      onFrame: async () => { await pose.send({image: video}); },
-      width: 640, height: 480
-    });
-
-    function runCamera() {
+    // --- REAR CAMERA SELECTION ---
+    async function runCamera() {
       document.getElementById('startBtn').style.display = 'none';
       document.getElementById('activeBtns').style.display = 'block';
-      cam.start();
+
+      const constraints = {
+        video: { 
+          facingMode: { exact: "environment" },
+          width: { ideal: 640 },
+          height: { ideal: 480 }
+        }
+      };
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = stream;
+        video.play();
+        
+        const cam = new Camera(video, {
+          onFrame: async () => { await pose.send({image: video}); },
+          width: 640, height: 480
+        });
+        cam.start();
+      } catch (err) {
+        console.error("Rear camera not found, trying default", err);
+        // Fallback if "exact: environment" fails
+        const cam = new Camera(video, {
+          onFrame: async () => { await pose.send({image: video}); },
+          width: 640, height: 480
+        });
+        cam.start();
+      }
     }
 
     function capture() {
@@ -166,11 +143,7 @@
       ctx.fillText(`Name: ${name}`, 20, 30);
       ctx.fillText(`Joint: ${mode.toUpperCase()}`, 20, 50);
       ctx.fillText(`L: ${document.getElementById('l-deg').innerText} R: ${document.getElementById('r-deg').innerText}`, 20, 75);
-
-      const a = document.createElement('a');
-      a.download = `${name}_ROM.png`;
-      a.href = canvas.toDataURL();
-      a.click();
+      const a = document.createElement('a'); a.download = `${name}_ROM.png`; a.href = canvas.toDataURL(); a.click();
     }
 
     window.onresize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
